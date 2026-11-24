@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FastFrames Studio</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{
+  --bg:#1e1e1e; --side:#262626; --panel:#2b2b2b; --panel2:#323232; --line:#3a3a3a; --well:#1a1a1a;
+  --text:#ececec; --dim:#9a9a9a; --faint:#6e6e6e; --sel:#3a3a3a; --blue:#4f9cff; --green:#43c463;
+  --orange:#f0a73a; --red:#ff5f57; --radius:8px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font:13px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+.app{display:grid;grid-template-columns:220px 1fr;height:100vh}
+/* sidebar */
+.side{background:var(--side);border-right:1px solid #111;display:flex;flex-direction:column;padding:14px 8px 10px}
+.brand{display:flex;align-items:center;gap:9px;padding:4px 8px 16px}
+.brand .logo{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#4f9cff,#9b5cff 55%,#ff6a88);
+  display:grid;place-items:center}
+.brand b{font-size:14px;letter-spacing:.2px}
+.brand small{display:block;color:var(--faint);font-size:11px;margin-top:-2px}
+.nav-h{color:var(--dim);font-size:11.5px;font-weight:600;padding:12px 8px 4px}
+.nav{display:flex;align-items:center;gap:10px;width:100%;padding:6px 10px;border:0;background:none;border-radius:7px;
+  cursor:pointer;text-align:left;color:var(--text);font-size:13px}
+.nav:hover{background:#2f2f2f}
+.nav.on{background:var(--sel)}
+.nav svg{width:16px;height:16px;opacity:.85;flex:none}
+.side .grow{flex:1}
+.meters{border-top:1px solid var(--line);padding:10px 4px 4px;font-size:11px;color:var(--dim)}
+.meter{display:grid;grid-template-columns:34px 1fr 64px;align-items:center;gap:8px;margin:4px 0}
+.bar{height:5px;background:#3b3b3b;border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--green);border-radius:3px;transition:width .6s}
+.meter span:last-child{text-align:right;color:var(--text)}
+.llm{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);margin-top:8px;padding:8px 4px 0}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--faint);margin-right:5px;vertical-align:1px}
+.dot.ok{background:var(--green)} .dot.busy{background:var(--orange)}
+/* main */
+.page{display:none;height:100vh;overflow:hidden}
+.page.on{display:grid}
+#p-video{grid-template-columns:minmax(380px,460px) 1fr}
+.col{overflow-y:auto;padding:22px 18px 20px 16px;border-right:1px solid #161616}
+.lbl{font-weight:600;font-size:13px;margin:0 0 7px;display:flex;align-items:center;gap:8px}
+.lbl .sub{font-weight:400;color:var(--dim);font-size:12px}
+.lbl .sp{flex:1}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px}
+.model{display:flex;align-items:center;gap:10px}
+.model .t{font-weight:600;font-size:12.5px}
+.model .s{color:var(--dim);font-size:11.5px}
+.model .grow{flex:1}
+.pill{background:var(--panel2);border:1px solid #444;border-radius:6px;padding:3px 9px;font-size:12px;color:var(--text);white-space:nowrap}
+.row{display:flex;align-items:center;gap:8px}
+.mt{margin-top:16px}.mt2{margin-top:8px}
+.hint{color:var(--dim);font-size:12px}
+.btn{background:var(--panel2);border:1px solid #474747;border-radius:6px;padding:4px 11px;cursor:pointer;font-size:12.5px;
+  display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{background:#3b3b3b}
+.btn:disabled{opacity:.45;cursor:default}
+.btn svg{width:13px;height:13px}
+.btn.blue{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.blue:hover{background:#3f8cf0}
+.btn.ghost{background:none;border-color:transparent;color:var(--blue)}
+textarea,input[type=text],input[type=number],select{background:var(--well);border:1px solid var(--line);border-radius:6px;padding:7px 9px;outline:none}
+textarea:focus,input:focus,select:focus{border-color:#5a5a5a;box-shadow:0 0 0 3px rgba(79,156,255,.25)}
+textarea{width:100%;resize:vertical;min-height:120px;line-height:1.45}
+input[type=number]{width:110px}
+.seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:2px}
+.seg button{flex:1;border:0;background:none;padding:5px 6px;border-radius:5px;cursor:pointer;font-size:12.5px;color:var(--text)}
+.seg button.on{background:#4a4a4a}
+input[type=range]{width:100%;accent-color:#d9d9d9}
+details summary{cursor:pointer;font-weight:600;list-style:none;display:flex;align-items:center;gap:6px}
+details summary::before{content:"›";display:inline-block;transition:transform .15s;font-size:16px;line-height:1}
+details[open] summary::before{transform:rotate(90deg)}
+.gen{width:100%;justify-content:center;padding:8px;font-size:13.5px;margin-top:18px}
+.center{text-align:center}
+.menu{position:relative}
+.menu-list{display:none;position:absolute;right:0;top:28px;z-index:20;width:330px;max-height:340px;overflow:auto;background:#2d2d2d;
+  border:1px solid #4a4a4a;border-radius:8px;box-shadow:0 12px 30px rgba(0,0,0,.5);padding:4px}
+.menu.open .menu-list{display:block}
+.menu-list button{display:block;width:100%;text-align:left;border:0;background:none;padding:7px 9px;border-radius:5px;cursor:pointer;font-size:12.5px}
+.menu-list button:hover{background:var(--blue);color:#fff}
+.menu-list b{display:block}
+.menu-list span{color:var(--dim);font-size:11.5px}
+.menu-list button:hover span{color:#e6efff}
+/* preview */
+.preview{padding:18px;display:flex;flex-direction:column;min-width:0}
+.stage{flex:1;background:var(--well);border-radius:10px;display:grid;place-items:center;position:relative;overflow:hidden;min-height:0}
+.empty{color:var(--dim);text-align:center}
+.empty svg{width:42px;height:42px;opacity:.5;margin-bottom:10px}
+.empty b{display:block;color:var(--text);font-size:15px;margin-bottom:4px;opacity:.85}
+video{max-width:100%;max-height:100%;border-radius:6px;background:#000}
+.prog{width:min(460px,80%);text-align:center}
+.prog .bar{height:6px;margin:14px 0 8px}
+.prog .bar i{background:var(--blue)}
+.frames{display:flex;gap:2px;justify-content:center;margin-top:14px}
+.frames i{width:9px;height:18px;border-radius:2px;background:#333}
+.frames i.d{background:var(--blue)}
+.meta{display:flex;gap:14px;flex-wrap:wrap;color:var(--dim);font-size:12px;margin-top:10px;align-items:center}
+.meta b{color:var(--text);font-weight:500}
+.foot{text-align:center;padding-top:10px}
+.err{color:#ff8a80;font-size:12.5px;margin-top:8px;white-space:pre-wrap}
+/* generator */
+#p-gen,#p-lib,#p-set{display:none;overflow-y:auto}
+#p-gen.on,#p-lib.on,#p-set.on{display:block}
+.wrap{max-width:900px;margin:0 auto;padding:26px 28px 40px}
+h1{font-size:20px;margin:0 0 4px;font-weight:650}
+.lead{color:var(--dim);margin:0 0 20px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.ing .lbl{margin-bottom:5px}
+.ing select{width:100%}
+.ing .row select{flex:1}
+.dice{width:30px;height:30px;padding:0;justify-content:center}
+.saved{margin-top:22px}
+.saved .item{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)}
+.saved .item p{margin:0;flex:1;color:#d6d6d6;font-size:12.5px}
+/* library */
+.lib{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
+.clip{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.clip video{width:100%;aspect-ratio:832/480;border-radius:0;display:block}
+.clip .b{padding:9px 11px}
+.clip p{margin:0 0 6px;font-size:12px;color:#d6d6d6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.clip .row{flex-wrap:wrap;gap:6px}
+.pm{display:flex;align-items:center;gap:8px;margin:0 0 18px}
+.pm select{flex:1;min-width:0}
+.pm .hint{white-space:nowrap}
+.set-sec{margin-bottom:22px}
+.set-sec .card{margin-top:8px}
+.kv{display:grid;grid-template-columns:150px 1fr;gap:8px 12px;align-items:center}
+.kv code{color:#cfcfcf;font-size:11.5px;word-break:break-all}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#3a3a3a;border:1px solid #555;padding:8px 14px;border-radius:8px;
+  opacity:0;transition:opacity .25s;pointer-events:none;z-index:50}
+.toast.on{opacity:1}
+.spin{width:13px;height:13px;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+::-webkit-scrollbar{width:9px}::-webkit-scrollbar-thumb{background:#4a4a4a;border-radius:5px;border:2px solid var(--bg)}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <div class="logo"><svg width="15" height="15" viewBox="0 0 24 24" fill="#fff"><path d="M4 5h11a2 2 0 0 1 2 2v1.6l3.4-2.1A1 1 0 0 1 22 7.4v9.2a1 1 0 0 1-1.6.9L17 15.4V17a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/></svg></div>
+      <div><b>FastFrames Studio</b><small>MLX · on this Mac</small></div>
+    </div>
+    <div class="nav-h">Create</div>
+    <button class="nav on" data-p="video"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4"/></svg>Video Generation</button>
+    <button class="nav" data-p="gen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.5L12 15l-1.8-4.5L5.5 9l4.7-1.4z"/><path d="M19 15l.8 2 2 .8-2 .7-.8 2-.8-2-2-.7 2-.8z"/></svg>Prompt Generator</button>
+    <div class="nav-h">Library</div>
+    <button class="nav" data-p="lib"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg>Clips <span id="libCount" class="hint" style="margin-left:auto"></span></button>
+    <button class="nav" data-p="set"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button>
+    <div class="grow"></div>
+    <div class="meters">
+      <div class="meter"><span>GPU</span><div class="bar"><i id="mGpu"></i></div><span id="tGpu">—</span></div>
+      <div class="meter"><span>MEM</span><div class="bar"><i id="mMem"></i></div><span id="tMem">—</span></div>
+      <div class="llm"><span><span class="dot" id="llmDot"></span>Prompt model</span><span id="llmTxt" class="hint">off</span></div>
+    </div>
+  </aside>
+
+  <main>
+    <!-- ============ VIDEO ============ -->
+    <section class="page on" id="p-video">
+      <div class="col">
+        <div class="lbl">Model</div>
+        <div class="card model">
+          <div class="grow">
+            <div class="t">FastFrames-S (1.3B) — MLX bf16</div>
+            <div class="s">Apple ML Research · 832×480 · 16 fps · ~11 GB RAM</div>
+          </div>
+          <span class="pill" id="modelState"><span class="dot ok"></span>Ready</span>
+        </div>
+
+        <div class="lbl mt">Prompt
+          <span class="sp"></span>
+          <button class="btn" id="enhanceBtn" title="Rewrite your idea as a detailed video prompt with the local prompt model">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.5L12 15l-1.8-4.5L5.5 9l4.7-1.4z"/></svg>Enhance…</button>
+          <div class="menu" id="tplMenu">
+            <button class="btn" id="tplBtn">Templates <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="menu-list" id="tplList"></div>
+          </div>
+        </div>
+        <textarea id="prompt" placeholder="Describe the shot: subject, motion, setting, light, camera, style. Long, specific prompts follow the text more closely."></textarea>
+        <div class="row mt2"><span class="hint" id="pCount">0 words</span><span style="flex:1"></span>
+          <span class="hint">Enhance uses <a href="#" id="pmLink" style="color:var(--blue);text-decoration:none">…</a></span>
+</div>
+        <div class="row"><span style="flex:1"></span><button class="btn ghost" id="toGen">Open Prompt Generator →</button></div>
+
+        <div class="lbl mt">Length <span class="sub">FastFrames makes up to 5 s per clip</span></div>
+        <div class="seg" id="lenSeg">
+          <button data-f="5">Preview · 1 s</button><button data-f="11">2.6 s</button><button data-f="16">3.8 s</button><button data-f="21" class="on">Full · 5 s</button>
+        </div>
+        <div class="row mt2"><span class="hint">Frames</span><span style="flex:1"></span><span class="hint" id="lenTxt"></span></div>
+        <input type="range" id="frames" min="2" max="21" value="21">
+
+        <div class="lbl mt">Seed <span class="sub">same prompt + seed = same clip</span></div>
+        <div class="row">
+          <input type="number" id="seed" value="0" min="0">
+          <button class="btn dice" id="seedDice" title="Random seed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.3" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/></svg></button>
+          <label class="row hint" style="margin-left:8px"><input type="checkbox" id="seedAuto"> New seed each time</label>
+        </div>
+
+        <details class="mt">
+          <summary>Advanced options</summary>
+          <div class="mt2">
+            <div class="lbl">Pixel decoder precision</div>
+            <div class="seg" id="decSeg"><button data-d="fp32" class="on">fp32 (default)</button><button data-d="bf16">bf16 (Apple's release setting)</button></div>
+            <div class="hint mt2">Text embeddings are cached, so re-running a prompt skips the 11 GB text encoder.</div>
+          </div>
+        </details>
+
+        <button class="btn blue gen" id="genBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.5L12 15l-1.8-4.5L5.5 9l4.7-1.4z"/></svg>Generate</button>
+        <div class="center hint mt2">🖥 Renders on this Mac.</div>
+        <div class="center hint" id="etaTxt"></div>
+        <div class="err" id="genErr"></div>
+      </div>
+
+      <div class="preview">
+        <div class="stage" id="stage">
+          <div class="empty" id="emptyState">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4"/></svg>
+            <b>No generation yet</b>Enter a prompt and press Generate.
+          </div>
+        </div>
+        <div class="meta" id="resultMeta"></div>
+        <div class="foot"><button class="btn ghost" id="openFolder">📁 Open output folder in Finder</button></div>
+      </div>
+    </section>
+
+    <!-- ============ PROMPT GENERATOR ============ -->
+    <section class="page" id="p-gen">
+      <div class="wrap">
+        <h1>Prompt Generator</h1>
+        <p class="lead">Pick ingredients (or roll the dice), then build a prompt instantly or have a local language model write a full cinematic one.</p>
+        <div class="lbl">Prompt model <span class="sub">only models that loaded and answered on this Mac are listed</span></div>
+        <div class="pm"><select id="pmSel"><option>Scanning your models…</option></select>
+          <button class="btn" id="pmRefresh" title="Look for new models">↻ Rescan</button></div>
+        <div class="hint" id="pmStatus" style="margin:-10px 0 18px"></div>
+
+        <div class="grid" id="ingGrid"></div>
+        <div class="row mt">
+          <button class="btn" id="rollAll">🎲 Randomize all</button>
+          <button class="btn" id="clearAll">Clear</button>
+          <span style="flex:1"></span>
+          <span class="hint">Theme (optional)</span>
+          <input type="text" id="theme" placeholder="e.g. cozy winter, sci‑fi city, nature documentary" style="width:300px">
+        </div>
+        <div class="row mt">
+          <button class="btn" id="buildBtn">Build prompt</button>
+          <button class="btn blue" id="writeBtn">✦ Write with prompt model</button>
+          <button class="btn" id="surpriseBtn">✦ Surprise me</button>
+          <span class="hint" id="genHint"></span>
+        </div>
+        <div class="lbl mt">Result <span class="sp"></span><span class="hint" id="rCount"></span></div>
+        <textarea id="result" placeholder="Your prompt appears here. You can edit it."></textarea>
+        <div class="row mt2">
+          <button class="btn blue" id="useBtn">Use in Video Generation →</button>
+          <button class="btn" id="expandBtn">✦ Expand / polish</button>
+          <button class="btn" id="saveBtn">☆ Save</button>
+          <button class="btn" id="copyBtn">Copy</button>
+        </div>
+        <div class="err" id="gErr"></div>
+        <div class="saved"><div class="lbl">Saved prompts</div><div id="savedList" class="hint">Nothing saved yet.</div></div>
+      </div>
+    </section>
+
+    <!-- ============ LIBRARY ============ -->
+    <section class="page" id="p-lib">
+      <div class="wrap" style="max-width:1200px">
+        <div class="row"><h1>Clips</h1><span style="flex:1"></span><button class="btn" id="libFolder">📁 Show in Finder</button></div>
+        <p class="lead">Every clip you generate, newest first.</p>
+        <div class="lib" id="libGrid"></div>
+      </div>
+    </section>
+
+    <!-- ============ SETTINGS ============ -->
+    <section class="page" id="p-set">
+      <div class="wrap">
+        <h1>Settings</h1>
+        <p class="lead">Where the prompt generator gets its words, and where your files live.</p>
+        <div class="set-sec">
+          <div class="lbl">Prompt models</div>
+          <div class="card">
+            <div class="hint">FastFrames Studio looks for GGUF chat models in these folders (one per line), runs them with llama.cpp's <code>llama-server</code>, and test-loads each one once. It also lists models from MLX-Serve, LM Studio and Ollama while those apps are running.</div>
+            <textarea id="searchDirs" style="min-height:90px;margin-top:8px;font:12px ui-monospace,Menlo,monospace"></textarea>
+            <div class="kv mt2">
+              <span>llama-server</span><input type="text" id="llamaPath" placeholder="auto-detect">
+              <span>Detected</span><code id="llamaFound"></code>
+            </div>
+            <div class="row mt2">
+              <label class="row"><input type="checkbox" id="keepLlm"> Keep the prompt model loaded between prompts</label>
+              <span style="flex:1"></span><button class="btn" id="stopLlm">Unload now</button>
+            </div>
+          </div>
+          <div class="row mt2"><button class="btn blue" id="saveSet">Save</button><span class="hint" id="setMsg"></span></div>
+        </div>
+        <div class="set-sec">
+          <div class="lbl">Files</div>
+          <div class="card kv">
+            <span>Model</span><code id="fModel"></code>
+            <span>Clips</span><code id="fOut"></code>
+            <span>Full 5 s clip</span><span class="hint" id="fEta"></span>
+          </div>
+        </div>
+        <div class="set-sec">
+          <div class="lbl">Quit</div>
+          <div class="card row"><span class="hint" style="flex:1">Closing the window leaves Studio running in the background so it opens instantly next time. Quit stops it and unloads the prompt model.</span>
+            <button class="btn" id="quitBtn">Quit FastFrames Studio</button></div>
+        </div>
+        <div class="set-sec">
+          <div class="lbl">License</div>
+          <div class="card hint">FastFrames weights are under Apple's Machine Learning Research Model License: non‑commercial research use only. The MLX port is an unofficial community port, not made or endorsed by Apple.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const api = async (path, body) => {
+  const r = await fetch(path, body === undefined ? {} : {method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(body)});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+};
+const toast = m => { const t=$("#toast"); t.textContent=m; t.classList.add("on"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("on"),2200); };
+const fmtDur = s => { s=Math.max(0,Math.round(s)); return s<60 ? `${s} s` : `${Math.floor(s/60)} min ${s%60} s`; };
+const words = t => (t.trim().match(/\S+/g)||[]).length;
+
+/* navigation */
+function show(p){ if(!document.getElementById("p-"+p)) p="video"; if(location.hash.slice(1)!==p) history.replaceState(null,"","#"+p);
+  $$(".nav").forEach(b=>b.classList.toggle("on",b.dataset.p===p)); $$(".page").forEach(x=>x.classList.toggle("on",x.id==="p-"+p));
+  if(p==="lib") loadLib(); if(p==="set") loadSet(); }
+$$(".nav").forEach(b=>b.onclick=()=>show(b.dataset.p));
+window.addEventListener("hashchange",()=>show(location.hash.slice(1)));
+
+/* ---------------- templates ---------------- */
+const TEMPLATES = [
+ ["Fox in snow","A red fox trotting through fresh snow in a pine forest, morning light, low tracking shot at the fox's eye level, soft golden sunbeams between the trunks, breath visible in the cold air, shallow depth of field, natural documentary style."],
+ ["Big Sur drone","A drone view of waves crashing against the rugged cliffs along Big Sur's Garay Point beach. The crashing blue waters create white-tipped waves, while the golden light of the setting sun illuminates the rocky shore, casting long shadows. Green shrubbery covers the cliff's edge. The camera glides slowly forward, a bird's-eye view bathed in a warm golden hue."],
+ ["Neon city rain","A lone woman in a yellow raincoat walks toward the camera down a narrow Tokyo alley at night, neon signs in pink and teal reflecting in deep puddles, steady rain streaking through the light, steam rising from a street vent, slow dolly backward, cinematic, anamorphic lens flares."],
+ ["Coffee pour macro","Extreme close-up of hot coffee being poured into a white ceramic cup on a wooden table, swirling caramel-brown crema, wisps of steam curling upward, warm window light from the left, slow push-in, shallow depth of field, commercial food photography style."],
+ ["Astronaut on Mars","An astronaut in a white and orange spacesuit walks slowly across rusty red Martian dunes, boots kicking up fine dust, a small rover parked behind, pale pink sky with a faint sun low on the horizon, wide shot with the camera tracking alongside, realistic sci-fi film look."],
+ ["Llama disco","A realistic photo of a llama wearing colorful pajamas dancing energetically on a stage under vibrant disco lighting. The llama has large floppy ears and a playful expression, wearing a red and yellow striped pajama top. Glittering disco balls cast moving spots of light. A dynamic shot from a slightly elevated angle."],
+ ["Ocean reef","A green sea turtle glides over a vibrant coral reef in clear turquoise water, schools of small silver fish parting around it, sun rays rippling down from the surface, the camera swims alongside at the same depth, nature documentary, crisp detail."],
+ ["Vintage car desert","A cherry-red 1960s convertible drives fast along an empty desert highway at sunset, dust trailing behind, distant mesas glowing orange, low angle tracking shot from the roadside, warm film grain, nostalgic 35mm look."],
+ ["Cozy cabin","Inside a cozy wooden cabin at night, a crackling fireplace casts flickering orange light across a sleeping tabby cat on a knitted blanket, snow falling outside the frosted window, slow gentle push-in, warm and calm mood, soft cinematic lighting."],
+ ["Paper boat","A small white paper boat floats down a rain-filled street gutter, bobbing over tiny ripples, reflections of colorful shop lights in the water, camera follows at water level, overcast afternoon, whimsical storybook mood, shallow depth of field."],
+];
+$("#tplList").innerHTML = TEMPLATES.map((t,i)=>`<button data-i="${i}"><b>${t[0]}</b><span>${t[1].slice(0,88)}…</span></button>`).join("");
+$("#tplBtn").onclick = e => { e.stopPropagation(); $("#tplMenu").classList.toggle("open"); };
+document.addEventListener("click", ()=>$("#tplMenu").classList.remove("open"));
+$("#tplList").onclick = e => { const b=e.target.closest("button"); if(!b) return; setPrompt(TEMPLATES[b.dataset.i][1]); };
+
+/* ---------------- video page ---------------- */
+let profile = null, decoder = "fp32";
+function setPrompt(t){ $("#prompt").value=t; updCount(); localStorage.ffPrompt=t; }
+function updCount(){ const n=words($("#prompt").value); $("#pCount").textContent = `${n} word${n===1?"":"s"}` + (n && n<20 ? " · longer prompts follow the text more closely" : ""); }
+$("#prompt").oninput = ()=>{ updCount(); localStorage.ffPrompt=$("#prompt").value; };
+function etaFor(f){ const p=profile||[]; let s=7; for(let i=0;i<f;i++) s+= p[Math.min(i,p.length-1)]||4.5; return s; }
+function updLen(){
+  const f=+$("#frames").value, vf=4*f-3;
+  $("#lenTxt").textContent = `${vf} frames · ${(vf/16).toFixed(1)} s`;
+  $$("#lenSeg button").forEach(b=>b.classList.toggle("on", +b.dataset.f===f));
+  $("#etaTxt").textContent = `about ${fmtDur(etaFor(f))} — estimated for this Mac`;
+  localStorage.ffFrames=f;
+}
+$("#frames").oninput = updLen;
+$$("#lenSeg button").forEach(b=>b.onclick=()=>{ $("#frames").value=b.dataset.f; updLen(); });
+$$("#decSeg button").forEach(b=>b.onclick=()=>{ decoder=b.dataset.d; $$("#decSeg button").forEach(x=>x.classList.toggle("on",x===b)); });
+const rndSeed = ()=>Math.floor(Math.random()*2**31);
+$("#seedDice").onclick = ()=>{ $("#seed").value=rndSeed(); };
+$("#seedAuto").onchange = e => localStorage.ffSeedAuto = e.target.checked ? "1" : "";
+$("#toGen").onclick = ()=>{ $("#theme").value = $("#prompt").value.slice(0,120); show("gen"); };
+$("#openFolder").onclick = ()=>api("/api/reveal",{});
+$("#libFolder").onclick = ()=>api("/api/reveal",{});
+
+$("#enhanceBtn").onclick = async ()=>{
+  const idea=$("#prompt").value.trim(); if(!idea){ toast("Type an idea first"); return; }
+  const b=$("#enhanceBtn"), old=b.innerHTML; b.disabled=true; b.innerHTML=`<span class="spin"></span>Enhancing…`; $("#genErr").textContent="";
+  try{ const r=await api("/api/enhance",{prompt:idea}); setPrompt(r.prompt); toast("Prompt enhanced"); }
+  catch(e){ $("#genErr").textContent=e.message; }
+  finally{ b.disabled=false; b.innerHTML=old; }
+};
+
+let polling=null, lastJob=0, shownResult=0;
+$("#genBtn").onclick = async ()=>{
+  if($("#genBtn").dataset.mode==="cancel"){ await api("/api/cancel",{}); return; }
+  $("#genErr").textContent="";
+  if($("#seedAuto").checked) $("#seed").value=rndSeed();
+  try{
+    const r=await api("/api/generate",{prompt:$("#prompt").value, frames:+$("#frames").value, seed:+$("#seed").value, decoder});
+    lastJob=r.id; poll();
+  }catch(e){ $("#genErr").textContent=e.message; }
+};
+function setRunning(on){
+  const b=$("#genBtn"); b.dataset.mode = on ? "cancel" : "";
+  b.innerHTML = on ? `<span class="spin"></span>Cancel` : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.5L12 15l-1.8-4.5L5.5 9l4.7-1.4z"/></svg>Generate`;
+  b.classList.toggle("blue", !on);
+}
+function renderProgress(j){
+  const el=$("#emptyState"); if(el) el.remove();
+  let p=$("#progBox");
+  if(!p){ $("#resultMeta").innerHTML="";$("#stage").innerHTML=`<div class="prog" id="progBox"><div id="pStage" style="font-weight:600"></div><div class="bar"><i id="pBar"></i></div><div class="hint" id="pTime"></div><div class="frames" id="pFrames"></div><div class="hint mt2" id="pPrompt" style="opacity:.8"></div></div>`; p=$("#progBox"); }
+  const el2=s=>document.getElementById(s);
+  el2("pStage").textContent=j.stage||"Working…";
+  el2("pBar").style.width=Math.round((j.progress||0)*100)+"%";
+  const el_=(j.now||Date.now()/1000)-(j.started||0), left=Math.max(0,(j.eta||0)-el_);
+  el2("pTime").textContent=`${fmtDur(el_)} elapsed · about ${fmtDur(left)} left`;
+  const done=(j.frame_times||[]).length;
+  el2("pFrames").innerHTML=Array.from({length:j.frames||21},(_,i)=>`<i class="${i<done?"d":""}"></i>`).join("");
+  el2("pPrompt").textContent=`seed ${j.seed} · ${(j.prompt||"").slice(0,140)}${(j.prompt||"").length>140?"…":""}`;
+}
+function renderResult(rec){
+  $("#stage").innerHTML=`<video src="/outputs/${encodeURIComponent(rec.file)}" controls autoplay loop playsinline></video>`;
+  $("#resultMeta").innerHTML=`<span><b>${rec.seconds} s</b> · ${rec.video_frames} frames</span><span>made in <b>${fmtDur(rec.total_s)}</b></span><span>seed <b>${rec.seed}</b></span><span>peak <b>${rec.peak_gb} GB</b></span><span style="flex:1"></span><button class="btn ghost" onclick="api('/api/reveal',{file:'${rec.file}'})">Show in Finder</button>`;
+}
+async function poll(){
+  clearTimeout(polling);
+  let j; try{ j=await api("/api/status"); }catch(e){ polling=setTimeout(poll,1500); return; }
+  if(j.state==="running"){ setRunning(true); renderProgress(j); polling=setTimeout(poll,700); return; }
+  setRunning(false);
+  if(j.state==="done" && j.result && shownResult!==j.id){ shownResult=j.id; renderResult(j.result); refreshCount(); loadConfig(); }
+  else if(j.state==="error" && shownResult!==j.id){ shownResult=j.id; $("#stage").innerHTML=`<div class="empty"><b>Generation failed</b><div class="err">${j.error||""}</div></div>`; }
+  else if(j.state==="cancelled" && shownResult!==j.id){ shownResult=j.id; $("#stage").innerHTML=`<div class="empty"><b>Cancelled</b>Press Generate to try again.</div>`; }
+}
+
+/* ---------------- prompt generator ---------------- */
+const ING = {
+  Subject:["a red fox","a golden retriever puppy","an elderly fisherman","a young woman in a yellow raincoat","an astronaut","a vintage red convertible","a hummingbird","a samurai in black armor","a paper boat","a tabby cat","a sea turtle","a ballet dancer","a giant robot","a hot air balloon","a street musician with a saxophone","a chef","a wild horse","a lighthouse keeper"],
+  Action:["walking slowly toward the camera","running through","turning to look over its shoulder","gliding gracefully","dancing energetically","drifting on the wind","splashing through water","climbing steadily","spinning in circles","leaping into the air","pouring steaming coffee","playing music","sleeping peacefully","exploring curiously"],
+  Setting:["a snowy pine forest","a neon-lit Tokyo alley in the rain","rugged sea cliffs","a sunflower field","the surface of Mars","a cozy wooden cabin","a misty mountain lake","a busy night market","an empty desert highway","a vibrant coral reef","a futuristic city skyline","an ancient temple courtyard","a quiet library","a windswept beach"],
+  Lighting:["golden hour sunlight","soft morning mist","blue hour twilight","moody overcast light","warm firelight","neon reflections","harsh midday sun","moonlight","volumetric god rays","candlelight","dramatic backlight at sunset"],
+  Camera:["slow push-in","low tracking shot at eye level","smooth drone flyover","handheld follow shot","wide establishing shot","extreme close-up","slow orbit around the subject","static locked-off shot","slow dolly backward","crane shot rising upward"],
+  Style:["cinematic, anamorphic lens","nature documentary","35mm film grain, nostalgic","photorealistic, crisp detail","dreamy, soft focus","commercial product look","storybook whimsy","epic sci-fi film","black and white noir","vibrant music video"],
+  Mood:["calm and peaceful","joyful and energetic","mysterious","epic and awe-inspiring","melancholic","cozy and warm","tense and suspenseful","playful"],
+};
+const sel = {};
+$("#ingGrid").innerHTML = Object.entries(ING).map(([k,opts])=>`<div class="ing"><div class="lbl">${k}</div><div class="row">
+  <select data-k="${k}"><option value="">— any —</option>${opts.map(o=>`<option>${o}</option>`).join("")}</select>
+  <button class="btn dice" data-roll="${k}" title="Random ${k.toLowerCase()}">🎲</button></div></div>`).join("");
+const pick = a => a[Math.floor(Math.random()*a.length)];
+$$("#ingGrid select").forEach(s=>s.onchange=()=>sel[s.dataset.k]=s.value);
+$$("#ingGrid [data-roll]").forEach(b=>b.onclick=()=>{ const k=b.dataset.roll, s=$(`select[data-k="${k}"]`); s.value=pick(ING[k]); sel[k]=s.value; });
+$("#rollAll").onclick=()=>Object.keys(ING).forEach(k=>{ const s=$(`select[data-k="${k}"]`); s.value=pick(ING[k]); sel[k]=s.value; });
+$("#clearAll").onclick=()=>{ $$("#ingGrid select").forEach(s=>{s.value=""; sel[s.dataset.k]="";}); $("#theme").value=""; };
+const ingText = ()=>Object.entries(sel).filter(([k,v])=>v).map(([k,v])=>`${k.toLowerCase()}: ${v}`).join("; ");
+function setResult(t){ $("#result").value=t; $("#rCount").textContent=`${words(t)} words`; }
+$("#result").oninput=()=>$("#rCount").textContent=`${words($("#result").value)} words`;
+$("#buildBtn").onclick=()=>{
+  const g=k=>sel[k]||pick(ING[k]);
+  let t=`${cap(g("Subject"))} ${g("Action")} in ${g("Setting")}, ${g("Lighting")}, ${g("Camera")}, ${g("Style")}, ${g("Mood")} mood.`;
+  if($("#theme").value.trim()) t=`${$("#theme").value.trim()}. `+t;
+  setResult(t);
+};
+const cap = s => s.charAt(0).toUpperCase()+s.slice(1);
+async function llmCall(btn, path, body, label){
+  const old=btn.innerHTML; btn.disabled=true; btn.innerHTML=`<span class="spin"></span>${label}`; $("#gErr").textContent="";
+  $("#genHint").textContent = llmState!=="ready" ? `Loading ${$("#pmLink").textContent}…` : "";
+  try{ const r=await api(path, body); setResult(r.prompt); }
+  catch(e){ $("#gErr").textContent=e.message; }
+  finally{ btn.disabled=false; btn.innerHTML=old; $("#genHint").textContent=""; }
+}
+$("#writeBtn").onclick=()=>{
+  const th=[$("#theme").value.trim(), ingText()].filter(Boolean).join(". ");
+  llmCall($("#writeBtn"),"/api/idea",{theme:th},"Writing…");
+};
+$("#surpriseBtn").onclick=()=>llmCall($("#surpriseBtn"),"/api/idea",{theme:$("#theme").value.trim()},"Dreaming…");
+$("#expandBtn").onclick=()=>{ const t=$("#result").value.trim(); if(!t){toast("Nothing to expand yet");return;} llmCall($("#expandBtn"),"/api/enhance",{prompt:t},"Polishing…"); };
+$("#useBtn").onclick=()=>{ const t=$("#result").value.trim(); if(!t){toast("Nothing to use yet");return;} setPrompt(t); show("video"); toast("Prompt sent to Video Generation"); };
+$("#copyBtn").onclick=()=>{ navigator.clipboard.writeText($("#result").value); toast("Copied"); };
+const saved = ()=>JSON.parse(localStorage.ffSaved||"[]");
+function renderSaved(){
+  const s=saved(); if(!s.length){ $("#savedList").innerHTML="Nothing saved yet."; return; }
+  $("#savedList").innerHTML=s.map((t,i)=>`<div class="item"><p>${t.replace(/</g,"&lt;")}</p><button class="btn" data-use="${i}">Use</button><button class="btn" data-del="${i}">✕</button></div>`).join("");
+}
+$("#savedList").onclick=e=>{ const u=e.target.dataset.use, d=e.target.dataset.del, s=saved();
+  if(u!==undefined){ setPrompt(s[u]); show("video"); } if(d!==undefined){ s.splice(d,1); localStorage.ffSaved=JSON.stringify(s); renderSaved(); } };
+$("#saveBtn").onclick=()=>{ const t=$("#result").value.trim(); if(!t) return; const s=saved(); s.unshift(t); localStorage.ffSaved=JSON.stringify(s.slice(0,50)); renderSaved(); toast("Saved"); };
+
+/* ---------------- library ---------------- */
+async function refreshCount(){ try{ const h=await api("/api/history"); $("#libCount").textContent=h.length||""; return h; }catch(e){ return []; } }
+async function loadLib(){
+  const h=await refreshCount();
+  $("#libGrid").innerHTML = h.length ? h.map(r=>`<div class="clip"><video src="/outputs/${encodeURIComponent(r.file)}" preload="metadata" muted loop onmouseenter="this.play()" onmouseleave="this.pause()" controls></video>
+    <div class="b"><p title="${r.prompt.replace(/"/g,"&quot;")}">${r.prompt.replace(/</g,"&lt;")}</p>
+    <div class="hint" style="margin-bottom:7px">${r.created} · ${r.seconds} s · seed ${r.seed} · ${fmtDur(r.total_s)}</div>
+    <div class="row"><button class="btn" data-reuse='${JSON.stringify({p:r.prompt,s:r.seed,f:r.latent_frames}).replace(/'/g,"&#39;")}'>Reuse</button>
+    <button class="btn" data-reveal="${r.file}">Finder</button><button class="btn" data-trash="${r.file}">Move to Trash</button></div></div></div>`).join("")
+    : `<div class="hint">No clips yet — generate one in Video Generation.</div>`;
+}
+$("#libGrid").onclick=async e=>{
+  const t=e.target;
+  if(t.dataset.reuse){ const r=JSON.parse(t.dataset.reuse); setPrompt(r.p); $("#seed").value=r.s; $("#frames").value=r.f; updLen(); show("video"); }
+  if(t.dataset.reveal) api("/api/reveal",{file:t.dataset.reveal});
+  if(t.dataset.trash && confirm("Move this clip to the Trash?")){ await api("/api/delete",{file:t.dataset.trash}); loadLib(); toast("Moved to Trash"); }
+};
+
+/* ---------------- settings ---------------- */
+let cfgCache={};
+async function loadConfig(){ cfgCache=await api("/api/config"); profile=cfgCache.frame_profile; updLen(); }
+async function loadSet(){
+  await loadConfig();
+  $("#keepLlm").checked=!!cfgCache.keep_llm_loaded; $("#searchDirs").value=(cfgCache.search_dirs||[]).join("\n");
+  $("#llamaPath").value=cfgCache.llama_server||""; $("#llamaFound").textContent=pmData.llama_server||"not found";
+  $("#fModel").textContent=cfgCache.model_dir; $("#fOut").textContent=cfgCache.out_dir; $("#fEta").textContent=`about ${fmtDur(etaFor(21))} on this Mac`;
+}
+$("#saveSet").onclick=async()=>{ await api("/api/config",{keep_llm_loaded:$("#keepLlm").checked, llama_server:$("#llamaPath").value.trim(),
+  model_search_dirs:$("#searchDirs").value.split("\n").map(x=>x.trim()).filter(Boolean)});
+  await api("/api/models/rescan",{}); await loadModels(); await loadSet(); $("#setMsg").textContent="Saved — models rescanned"; setTimeout(()=>$("#setMsg").textContent="",2000); };
+$("#stopLlm").onclick=async()=>{ await api("/api/llm/stop",{}); toast("Prompt model unloaded"); };
+$("#quitBtn").onclick=async()=>{ if(!confirm("Quit FastFrames Studio?")) return;
+  try{ await api("/api/quit",{}); document.body.innerHTML='<div style="display:grid;place-items:center;height:100vh;color:#9a9a9a">FastFrames Studio has quit. You can close this window.</div>'; }
+  catch(e){ toast(e.message); } };
+
+/* ---------------- prompt model picker ---------------- */
+let pmData={models:[]};
+const TIER={fast:"Fast — small models (seconds per prompt)",balanced:"Balanced — mid-size models",large:"Large — slower, most memory",server:"Running apps (MLX-Serve, LM Studio, Ollama)"};
+async function loadModels(){
+  try{ pmData=await api("/api/models"); }catch(e){ return; }
+  const sel=$("#pmSel"), groups={};
+  pmData.models.forEach(m=>{ const g=m.kind==="server"?"server":m.tier; (groups[g]=groups[g]||[]).push(m); });
+  let html="";
+  for(const g of ["fast","balanced","large","server"]){
+    if(!groups[g]) continue;
+    html+=`<optgroup label="${TIER[g]}">`+groups[g].map(m=>{
+      const bits=[m.size_h, m.tps?`${Math.round(m.tps)} tok/s`:"", m.kind==="server"?m.source:"", m.status==="checking"?"testing…":""].filter(Boolean).join(" · ");
+      return `<option value="${m.id}" ${m.status==="checking"?"disabled":""} ${m.id===pmData.current?"selected":""}>${m.name}${bits?"  —  "+bits:""}</option>`;
+    }).join("")+`</optgroup>`;
+  }
+  sel.innerHTML = html || `<option>No working models found — see Settings</option>`;
+  const cur=pmData.models.find(m=>m.id===pmData.current);
+  $("#pmLink").textContent = cur ? cur.name : "no model";
+  const ok=pmData.models.filter(m=>m.status!=="checking").length;
+  $("#pmStatus").textContent = (pmData.verifying ? `Testing ${pmData.verifying}… ` : "") +
+    (pmData.queue ? `${pmData.queue} model${pmData.queue>1?"s":""} still to test (one-time, in the background). ` : "") + `${ok} ready.`;
+}
+$("#pmSel").onchange=async e=>{ await api("/api/models/select",{id:e.target.value}); await loadModels(); toast("Prompt model: "+($("#pmLink").textContent)); };
+$("#pmRefresh").onclick=async()=>{ $("#pmStatus").textContent="Rescanning…"; await api("/api/models/rescan",{}); await loadModels(); };
+$("#pmLink").onclick=e=>{ e.preventDefault(); show("gen"); };
+setInterval(()=>{ if(pmData.queue||pmData.verifying) loadModels(); }, 5000);
+
+/* ---------------- meters ---------------- */
+let llmState="stopped";
+async function stats(){
+  try{
+    const s=await api("/api/stats");
+    if(s.gpu!=null){ $("#mGpu").style.width=s.gpu+"%"; $("#tGpu").textContent=s.gpu+"%"; }
+    if(s.mem_used!=null){ const u=s.mem_used/2**30, t=s.mem_total/2**30; $("#mMem").style.width=(100*u/t)+"%"; $("#tMem").textContent=`${Math.round(u)}/${Math.round(t)}G`; }
+    llmState=s.llm; $("#llmDot").className="dot "+(s.llm==="ready"?"ok":s.llm==="loading"?"busy":"");
+    $("#llmTxt").textContent= s.llm==="ready"?"loaded":s.llm==="loading"?"loading…":(s.llm_name?"ready":"none");
+    $("#llmTxt").title = s.llm_name||"";
+  }catch(e){}
+  setTimeout(stats,2000);
+}
+
+/* ---------------- boot ---------------- */
+(async()=>{
+  if(localStorage.ffPrompt) $("#prompt").value=localStorage.ffPrompt; updCount();
+  if(localStorage.ffFrames) $("#frames").value=localStorage.ffFrames;
+  $("#seedAuto").checked=!!localStorage.ffSeedAuto;
+  await loadConfig(); renderSaved(); refreshCount(); stats(); loadModels();
+  if(location.hash.length>1) show(location.hash.slice(1));
+  const j=await api("/api/status").catch(()=>({}));
+  if(j.state==="running") poll(); else if(j.state==="done"&&j.result){ shownResult=j.id; renderResult(j.result); }
+  else { const h=await api("/api/history").catch(()=>[]); if(h[0]) renderResult(h[0]); }
+})();
+</script>
+</body>
+</html>

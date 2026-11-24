@@ -1,0 +1,7 @@
+{
+ "model_dir": "",
+ "out_dir": "~/Movies/FastFrames Studio",
+ "llama_server": "",
+ "model_search_dirs": ["~/.lmstudio/models", "~/Models", "~/.cache/huggingface/hub"],
+ "keep_llm_loaded": true
+}

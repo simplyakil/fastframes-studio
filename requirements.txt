@@ -1,0 +1,6 @@
+# Python 3.10+ on Apple silicon. ffmpeg must be on PATH (brew install ffmpeg).
+mlx>=0.32
+numpy
+huggingface_hub
+transformers
+sentencepiece
