@@ -35,7 +35,7 @@ On an M1 Max a full 5-second clip takes about **1½ minutes**, and a 1-second pr
 ## Features
 
 ### 🎬 Video Generation
-- **Prompt box with Enhance** — turn *"a dog surfing at sunset"* into a rich, cinematic paragraph in about a second.
+- **Prompt box with Enhance** — turn *"a dog surfing at sunset"* into a rich, cinematic paragraph in about a second, with the writing model picker right there.
 - **Templates** — ten ready-made prompts to start from.
 - **Length presets** — 1 s preview, 2.6 s, 3.8 s or the full 5 s, plus a frame slider.
 - **Seeds** — same prompt + seed gives the same clip; roll a new seed or auto-randomize every run.
@@ -45,14 +45,15 @@ On an M1 Max a full 5-second clip takes about **1½ minutes**, and a 1-second pr
 <p align="center"><img src="assets/gen.png" width="900" alt="Prompt Generator"></p>
 
 ### ✨ Prompt Generator
-- **Ingredient pickers** — subject, action, setting, lighting, camera, style and mood, each with a 🎲 dice button, or **Randomize all**.
-- **Build prompt** — combines your picks instantly, no model needed.
-- **Write / Surprise me / Expand** — a local language model writes a full cinematic prompt from your ingredients, invents one from scratch, or polishes your own.
-- **Use any model you already have** — a dropdown lists every chat model on your Mac that actually works:
-  - GGUF files in LM Studio, Hugging Face and your own folders are **test-loaded once in the background** with llama.cpp (smallest first), and only models that load and answer are shown, with their measured speed.
+- **Describe it your way** — type what you want in plain words (*"a cat watching the rain from a café window in Tokyo at night"*), or ask a question (*"what would look amazing in a 5-second clip about autumn?"*), and a local language model writes a detailed, cinematic prompt. ⌘ Return to write.
+- **Ask for changes** — *"make it daytime"*, *"add a slow drone shot"*, *"more dramatic"* — and it revises the prompt, keeping everything else. One-click undo.
+- **Pick the writing model** — a dropdown (on this page and next to the Video prompt) lists every chat model on your Mac that actually works:
+  - GGUF files in LM Studio, Hugging Face and your own folders are **test-loaded once in the background** with llama.cpp (smallest first); only models that load and answer are shown, with their measured speed.
   - Models from **MLX-Serve, LM Studio and Ollama** appear automatically while those apps are running.
   - Image, audio, embedding and draft-model files are filtered out, and so are models too large to run next to the video model.
-- **Saved prompts** — keep your favourites and send any prompt straight to Video Generation.
+  - Small models such as LFM3-1.7B write a full prompt in about a second.
+- **Need ideas?** — optional ingredient pickers (subject, action, setting, lighting, camera, style, mood) with 🎲 dice: build a prompt instantly, have the model write from them, or **Surprise me**.
+- **Saved prompts** — keep favourites and send any prompt straight to Video Generation.
 
 <p align="center"><img src="assets/lib.png" width="900" alt="Clips library"></p>
 

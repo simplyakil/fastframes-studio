@@ -278,6 +278,18 @@ ENHANCE_SYSTEM = (
     "the action and motion, the setting and background, the lighting and time of day, the camera (shot size, "
     "angle, movement), and the visual style. Write " + RULES)
 
+WRITE_SYSTEM = (
+    "You write prompts for a text-to-video model that makes short cinematic clips. The user describes, in "
+    "their own words, the video they want. It may be rough notes, a full scene, a question, or a request for "
+    "ideas. Turn it into the single best prompt for what they asked: keep every element they mention, then add "
+    "concrete detail for the subject and its look, the action and motion, the setting, the lighting and time of "
+    "day, the camera (shot size, angle, movement) and the visual style. If they ask a question or want ideas, "
+    "answer by writing one prompt that fits. Write " + RULES)
+
+REFINE_SYSTEM = (
+    "You edit prompts for a text-to-video model. You get the current prompt and a change the user wants. Apply "
+    "the change, keep everything else that still fits, and return the complete revised prompt as " + RULES)
+
 IDEA_SYSTEM = (
     "You invent prompts for a text-to-video model that makes short cinematic clips. Invent one original, "
     "visually striking scene covering subject and look, action and motion, setting, lighting, camera shot and "
@@ -478,6 +490,11 @@ def clean_prompt(text):
 
 
 def chat(system, user, temperature=0.8):
+    t0 = time.time()
+    while not catalog["scanned"] and time.time() - t0 < 30:   # first scan still running after startup
+        if not catalog["scanning"]:
+            rescan()
+        time.sleep(0.2)
     m = current_model()
     if not m:
         raise RuntimeError("No working prompt model was found. Put a GGUF chat model in one of the search "
@@ -537,6 +554,8 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self.send_response(200)
         self.send_header("content-type", ctype)
+        if ctype.startswith("text/html"):
+            self.send_header("cache-control", "no-store")
         self.send_header("accept-ranges", "bytes")
         self.send_header("content-length", str(end - start + 1))
         self.end_headers()
@@ -563,6 +582,7 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/api/stats":
             s = stats()
             cm = current_model()
+            s["build"] = int(max((APP_DIR / f).stat().st_mtime for f in ("index.html", "app.py", "prompt_models.py")))
             s.update(llm=llm["state"] if llm["state"] != "ready" or _up(LLM_PORT) else "stopped",
                      llm_name=(cm or {}).get("name"), model_loaded=mlx_ready["loaded"],
                      verifying=verify["current"], verify_queue=verify["queue"])
@@ -608,6 +628,18 @@ class Handler(BaseHTTPRequestHandler):
                 if not idea:
                     return self._json({"error": "Type an idea first."}, 400)
                 return self._json({"prompt": chat(ENHANCE_SYSTEM, idea, 0.7)})
+            if p == "/api/write":
+                d = (body.get("description") or "").strip()
+                if not d:
+                    return self._json({"error": "Describe the video you want first."}, 400)
+                extra = (body.get("details") or "").strip()
+                user = d + (f"\n\nAlso include: {extra}" if extra else "")
+                return self._json({"prompt": chat(WRITE_SYSTEM, user, 0.7)})
+            if p == "/api/refine":
+                cur, req = (body.get("prompt") or "").strip(), (body.get("request") or "").strip()
+                if not cur or not req:
+                    return self._json({"error": "Need a prompt and the change you want."}, 400)
+                return self._json({"prompt": chat(REFINE_SYSTEM, f"Current prompt:\n{cur}\n\nChange: {req}", 0.5)})
             if p == "/api/idea":
                 theme = (body.get("theme") or "").strip()
                 user = f"Theme or ingredients: {theme}" if theme else "Surprise me with something visually striking."
