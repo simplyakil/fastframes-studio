@@ -132,6 +132,16 @@ textarea.ask{min-height:110px;font-size:14px}
 .ideas{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
 .ideas summary{font-weight:600}
 .pmmini{display:flex;align-items:center;gap:6px}
+.models{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.card.vm{text-align:left;cursor:pointer;padding:9px 11px;color:var(--text);font:inherit}
+.card.vm .t{font-weight:600;font-size:12.5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.card.vm .s{color:var(--dim);font-size:11.5px;margin-top:2px}
+.card.vm.on{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue) inset}
+.card.vm:disabled{opacity:.45;cursor:default}
+.tag{font-weight:500;font-size:10.5px;color:var(--dim);border:1px solid #4a4a4a;border-radius:4px;padding:0 5px}
+.tag.best{color:#c9b6ff;border-color:#6a55b0}
+.hint.warn{color:var(--orange)}
+.ltag{color:#c9b6ff;font-weight:600}
 .pmmini select{max-width:230px;padding:3px 6px;font-size:12px}
 .pm select{flex:1;min-width:0}
 .pm .hint{white-space:nowrap}
@@ -194,13 +204,17 @@ textarea.ask{min-height:110px;font-size:14px}
     <section class="page on" id="p-video">
       <div class="col">
         <div class="lbl">Model</div>
-        <div class="card model">
-          <div class="grow">
-            <div class="t">FastFrames-S (1.3B) — MLX bf16</div>
-            <div class="s">Apple ML Research · 832×480 · 16 fps · ~11 GB RAM</div>
-          </div>
-          <span class="pill" id="modelState"><span class="dot ok"></span>Ready</span>
+        <div class="models" id="vmSel">
+          <button class="card vm on" data-m="S">
+            <div class="t">FastFrames-S <span class="tag">1.3B · fast</span></div>
+            <div class="s">Quick drafts and previews · ~11 GB memory</div>
+          </button>
+          <button class="card vm" data-m="L" id="vmL">
+            <div class="t">FastFrames-L <span class="tag best">14B 8-bit · best quality</span></div>
+            <div class="s" id="vmLsub">Sharper, more realistic · ~28–48 GB memory</div>
+          </button>
         </div>
+        <div class="hint mt2" id="vmNote"></div>
 
         <div class="lbl mt">Prompt
           <span class="sp"></span>
@@ -415,12 +429,28 @@ let profile = null, decoder = "fp32";
 function setPrompt(t){ $("#prompt").value=t; updCount(); localStorage.ffPrompt=t; }
 function updCount(){ const n=words($("#prompt").value); $("#pCount").textContent = `${n} word${n===1?"":"s"}` + (n && n<20 ? " · longer prompts follow the text more closely" : ""); }
 $("#prompt").oninput = ()=>{ updCount(); localStorage.ffPrompt=$("#prompt").value; };
-function etaFor(f){ const p=profile||[]; let s=7; for(let i=0;i<f;i++) s+= p[Math.min(i,p.length-1)]||4.5; return s; }
+let vmodel = localStorage.ffModel==="L" ? "L" : "S";
+function etaFor(f, m=vmodel){ const p=(m==="L"?cfgCache.frame_profile_L:profile)||[]; let s=m==="L"?32:7; for(let i=0;i<f;i++) s+= p[Math.min(i,p.length-1)]||4.5; return s; }
+const lMem = f => Math.round(28.4 + 1.21*(f-5));
+function setVModel(m){
+  if(m==="L" && !cfgCache.l_available) m="S";
+  vmodel=m; localStorage.ffModel=m;
+  $$("#vmSel .vm").forEach(b=>b.classList.toggle("on", b.dataset.m===m));
+  updLen();
+}
+$$("#vmSel .vm").forEach(b=>b.onclick=()=>setVModel(b.dataset.m));
 function updLen(){
   const f=+$("#frames").value, vf=4*f-3;
   $("#lenTxt").textContent = `${vf} frames · ${(vf/16).toFixed(1)} s`;
   $$("#lenSeg button").forEach(b=>b.classList.toggle("on", +b.dataset.f===f));
-  $("#etaTxt").textContent = `about ${fmtDur(etaFor(f))} — estimated for this Mac`;
+  $("#etaTxt").textContent = `about ${fmtDur(etaFor(f))} — estimated for this Mac` + (vmodel==="L" && !cfgCache.l_timed ? " (rough until your first L clip)" : "");
+  const note=$("#vmNote");
+  if(vmodel==="L"){
+    const need=lMem(f), total=(lastStats.mem_total||0)/2**30, used=(lastStats.mem_used||0)/2**30, free=total-used;
+    note.textContent = `FastFrames-L needs about ${need} GB of memory for this length.` +
+      (total && need > free ? ` About ${Math.max(0,Math.round(free))} GB is free right now; quit other large apps first, or choose a shorter clip.` : "");
+    note.className = "hint mt2" + (total && need > free ? " warn" : "");
+  } else { note.textContent=""; }
   localStorage.ffFrames=f;
 }
 $("#frames").oninput = updLen;
@@ -447,7 +477,7 @@ $("#genBtn").onclick = async ()=>{
   $("#genErr").textContent="";
   if($("#seedAuto").checked) $("#seed").value=rndSeed();
   try{
-    const r=await api("/api/generate",{prompt:$("#prompt").value, frames:+$("#frames").value, seed:+$("#seed").value, decoder});
+    const r=await api("/api/generate",{prompt:$("#prompt").value, frames:+$("#frames").value, seed:+$("#seed").value, decoder, model:vmodel});
     lastJob=r.id; poll();
   }catch(e){ $("#genErr").textContent=e.message; }
 };
@@ -471,7 +501,7 @@ function renderProgress(j){
 }
 function renderResult(rec){
   $("#stage").innerHTML=`<video src="/outputs/${encodeURIComponent(rec.file)}" controls autoplay loop playsinline></video>`;
-  $("#resultMeta").innerHTML=`<span><b>${rec.seconds} s</b> · ${rec.video_frames} frames</span><span>made in <b>${fmtDur(rec.total_s)}</b></span><span>seed <b>${rec.seed}</b></span><span>peak <b>${rec.peak_gb} GB</b></span><span style="flex:1"></span><button class="btn ghost" onclick="api('/api/reveal',{file:'${rec.file}'})">Show in Finder</button>`;
+  $("#resultMeta").innerHTML=`<span><b>FastFrames-${rec.model||"S"}</b></span><span><b>${rec.seconds} s</b> · ${rec.video_frames} frames</span><span>made in <b>${fmtDur(rec.total_s)}</b></span><span>seed <b>${rec.seed}</b></span><span>peak <b>${rec.peak_gb} GB</b></span><span style="flex:1"></span><button class="btn ghost" onclick="api('/api/reveal',{file:'${rec.file}'})">Show in Finder</button>`;
 }
 async function poll(){
   clearTimeout(polling);
@@ -561,7 +591,7 @@ async function loadLib(){
   const h=await refreshCount();
   $("#libGrid").innerHTML = h.length ? h.map(r=>`<div class="clip"><video src="/outputs/${encodeURIComponent(r.file)}" preload="metadata" muted loop onmouseenter="this.play()" onmouseleave="this.pause()" controls></video>
     <div class="b"><p title="${r.prompt.replace(/"/g,"&quot;")}">${r.prompt.replace(/</g,"&lt;")}</p>
-    <div class="hint" style="margin-bottom:7px">${r.created} · ${r.seconds} s · seed ${r.seed} · ${fmtDur(r.total_s)}</div>
+    <div class="hint" style="margin-bottom:7px">${r.created} · ${r.model==="L"?'<span class="ltag">L</span> · ':""}${r.seconds} s · seed ${r.seed} · ${fmtDur(r.total_s)}</div>
     <div class="row"><button class="btn" data-reuse='${JSON.stringify({p:r.prompt,s:r.seed,f:r.latent_frames}).replace(/'/g,"&#39;")}'>Reuse</button>
     <button class="btn" data-reveal="${r.file}">Finder</button><button class="btn" data-trash="${r.file}">Move to Trash</button></div></div></div>`).join("")
     : `<div class="hint">No clips yet — generate one in Video Generation.</div>`;
@@ -575,7 +605,10 @@ $("#libGrid").onclick=async e=>{
 
 /* ---------------- settings ---------------- */
 let cfgCache={};
-async function loadConfig(){ cfgCache=await api("/api/config"); profile=cfgCache.frame_profile; updLen(); }
+async function loadConfig(){ cfgCache=await api("/api/config"); profile=cfgCache.frame_profile;
+  const ok=!!cfgCache.l_available; $("#vmL").disabled=!ok;
+  $("#vmLsub").textContent = ok ? "Sharper, more realistic · ~28–48 GB memory" : "Not set up — see the README";
+  setVModel(vmodel); }
 async function loadSet(){
   await loadConfig();
   $("#keepLlm").checked=!!cfgCache.keep_llm_loaded; $("#searchDirs").value=(cfgCache.search_dirs||[]).join("\n");
@@ -617,10 +650,10 @@ $("#pmRefresh").onclick=async()=>{ $("#pmStatus").textContent="Rescanning…"; a
 setInterval(()=>{ if(pmData.queue||pmData.verifying) loadModels(); }, 5000);
 
 /* ---------------- meters ---------------- */
-let llmState="stopped";
+let llmState="stopped", lastStats={};
 async function stats(){
   try{
-    const s=await api("/api/stats");
+    const s=await api("/api/stats"); lastStats=s;
     if(s.gpu!=null){ $("#mGpu").style.width=s.gpu+"%"; $("#tGpu").textContent=s.gpu+"%"; }
     if(s.mem_used!=null){ const u=s.mem_used/2**30, t=s.mem_total/2**30; $("#mMem").style.width=(100*u/t)+"%"; $("#tMem").textContent=`${Math.round(u)}/${Math.round(t)}G`; }
     if(s.build){ if(!window._build) window._build=s.build; else if(s.build!==window._build && $("#genBtn").dataset.mode!=="cancel") location.reload(); }

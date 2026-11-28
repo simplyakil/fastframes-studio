@@ -4,3 +4,4 @@ numpy
 huggingface_hub
 transformers
 sentencepiece
+ftfy            # FastFrames-L text cleaning

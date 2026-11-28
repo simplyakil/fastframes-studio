@@ -35,6 +35,7 @@ On an M1 Max a full 5-second clip takes about **1½ minutes**, and a 1-second pr
 ## Features
 
 ### 🎬 Video Generation
+- **Two models** — **FastFrames-S** (1.3B) for quick drafts, or **FastFrames-L** (14B, 8-bit) for clearly sharper, more realistic video on Macs with enough memory. The app shows how much memory the chosen length needs and warns you if it won't fit right now.
 - **Prompt box with Enhance** — turn *"a dog surfing at sunset"* into a rich, cinematic paragraph in about a second, with the writing model picker right there.
 - **Templates** — ten ready-made prompts to start from.
 - **Length presets** — 1 s preview, 2.6 s, 3.8 s or the full 5 s, plus a frame slider.
@@ -91,6 +92,31 @@ The first video downloads the [MLX port](https://huggingface.co/mlx-community/Fa
 (~15 GB) into your Hugging Face cache. Prefer the terminal? Run `./launch.sh`, or
 `.venv/bin/python app.py` and open <http://127.0.0.1:7870>.
 
+## FastFrames-L (optional, best quality)
+
+<p align="center"><img src="assets/compare-s-vs-l.png" width="900" alt="FastFrames-S (top) vs FastFrames-L 8-bit (bottom), same prompt and seed"></p>
+<p align="center"><sub>Same prompt and seed. Top: FastFrames-S, 23 s. Bottom: FastFrames-L 8-bit, 3 min 22 s (M1 Max, 64 GB).</sub></p>
+
+FastFrames-L runs through the community [MLX port](https://huggingface.co/mlx-community/FastFrames-L-bf16-mlx)
+with its 8-bit option, in its own process, so its memory is returned to macOS as soon as a clip is done.
+
+| clip length | peak memory (8-bit) | M1 Max 64 GB |
+|---|---|---|
+| 1 s (5 latent frames) | ~28 GB | 3 min 22 s |
+| 2.6 s (11) | ~36 GB | — |
+| 5 s (21) | ~48 GB | needs ~96 GB Mac or a mostly idle 64 GB one |
+
+Setup (about 31 GB of downloads plus a 15 GB 8-bit file built once):
+
+```bash
+hf download mlx-community/FastFrames-L-bf16-mlx --exclude "samples/*" --local-dir ~/Models/FastFrames-L-mlx
+```
+
+Then set `l_port_dir` in `config.json` to that folder. Leave `l_weights_dir` empty and the first L
+clip downloads Apple's weights (checked against Apple's SHA-256 sums) and builds the 8-bit file; or
+point it at a folder holding `dit`, `kv_refiner`, `pixel_decoder` and `umt5_xxl` `.safetensors`
+(the umT5 file can be the one from FastFrames-S).
+
 ## Configuration
 
 Copy `config.example.json` to `config.json` (it's git-ignored) and edit what you need:
@@ -102,6 +128,9 @@ Copy `config.example.json` to `config.json` (it's git-ignored) and edit what you
 | `llama_server` | path to `llama-server`; empty = auto-detect (PATH, Homebrew, `~/.unsloth/llama.cpp`) |
 | `model_search_dirs` | folders scanned for GGUF chat models |
 | `keep_llm_loaded` | keep the prompt model in memory between prompts |
+| `l_port_dir` | FastFrames-L MLX port folder (holds `ffmlx/run.py`); empty = L is off |
+| `l_weights_dir` | folder with the four L `.safetensors` files; empty = the port downloads them |
+| `l_cache_dir` | where the 8-bit L file and text embeddings go; empty = `~/.cache/fastframes-mlx` |
 
 Quitting the app (⌘Q, or **Settings → Quit**) stops the server and frees its memory. If you started
 the server with `./launch.sh` instead, it keeps running in the background until you quit it from Settings.

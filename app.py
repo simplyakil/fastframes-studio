@@ -50,6 +50,10 @@ DEFAULT_CONFIG = {
     "verified": {},                       # test-load results per model file
     "keep_llm_loaded": True,
     "frame_profile": DEFAULT_FRAME_S,
+    "l_port_dir": "",                     # FastFrames-L MLX port folder (holds ffmlx/run.py); "" = L unavailable
+    "l_weights_dir": "",                  # folder with dit/kv_refiner/pixel_decoder/umt5_xxl .safetensors; "" = port downloads
+    "l_cache_dir": "",                    # where the 8-bit DiT and text embeddings go; "" = ~/.cache/fastframes-mlx
+    "frame_profile_L": None,              # measured seconds per latent frame for L on this Mac
 }
 
 
@@ -137,10 +141,97 @@ cancel_flag = threading.Event()
 mlx_ready = {"loaded": False}
 
 
-def eta_seconds(latent_frames, text_cached=False):
-    prof = cfg.get("frame_profile") or DEFAULT_FRAME_S
+def eta_seconds(latent_frames, text_cached=False, model="S"):
+    if model == "L":
+        # until timed here: L is ~7x the work of S per frame (14B vs 1.3B DiT, M5 Max figures)
+        prof = cfg.get("frame_profile_L") or [x * 7 for x in DEFAULT_FRAME_S]
+        extra = 25                         # separate process: imports + loading ~17 GB of weights
+    else:
+        prof, extra = cfg.get("frame_profile") or DEFAULT_FRAME_S, 0
     per = [prof[i] if i < len(prof) else prof[-1] for i in range(latent_frames)]
-    return (0 if text_cached else 5) + sum(per) + 2
+    return (0 if text_cached else 5) + sum(per) + 2 + extra
+
+
+L_FILES = ("dit.safetensors", "kv_refiner.safetensors", "pixel_decoder.safetensors", "umt5_xxl.safetensors")
+
+
+def l_port():
+    """The FastFrames-L port folder, if it and (when a weights folder is set) all its weights are present."""
+    d = cfg.get("l_port_dir")
+    if not d or not (Path(os.path.expanduser(d)) / "ffmlx" / "run.py").exists():
+        return None
+    w = cfg.get("l_weights_dir")
+    if w and not all((Path(os.path.expanduser(w)) / f).exists() for f in L_FILES):
+        return None
+    return Path(os.path.expanduser(d))
+
+
+def l_memory_gb(latent_frames):
+    """Peak memory of FastFrames-L with 8-bit weights (port's figures: 28.4 GiB at 5, 47.8 at 21)."""
+    return round(28.4 + 1.21 * (latent_frames - 5), 1)
+
+
+worker = {"proc": None}
+
+
+def run_job_l(params):
+    """FastFrames-L runs in its own process (worker.py) so its 28-48 GB is freed as soon as it ends."""
+    jid, prompt, seed, frames = params["id"], params["prompt"], params["seed"], params["frames"]
+    out_mp4 = OUT_DIR / (time.strftime("%Y%m%d-%H%M%S") + f"_s{seed}_L.mp4")
+    stop_llm()                                   # give L the memory the prompt model was holding
+    env = dict(os.environ)
+    if cfg.get("l_cache_dir"):
+        env["FASTFRAMES_MLX_CACHE"] = os.path.expanduser(cfg["l_cache_dir"])
+    jobspec = {"port_dir": str(l_port()), "weights": os.path.expanduser(cfg.get("l_weights_dir") or ""),
+               "model": "L", "q8": True, "prompt": prompt, "seed": seed, "frames": frames,
+               "out": str(out_mp4), "decoder": params.get("decoder", "fp32")}
+    log = open(OUT_DIR / ".worker-L.log", "w")
+    t_start = time.time()
+    try:
+        proc = worker["proc"] = subprocess.Popen([sys.executable, "-s", "-E", str(APP_DIR / "worker.py"), json.dumps(jobspec)],
+                                                 stdout=subprocess.PIPE, stderr=log, text=True, env=env)
+        result, err, times = None, None, []
+        for line in proc.stdout:
+            try:
+                ev = json.loads(line)
+            except ValueError:
+                continue
+            if "stage" in ev:
+                _set(stage=ev["stage"])
+            if "frame" in ev:
+                times.append(ev["t"])
+                _set(stage=f"Generating frame {ev['frame']} of {frames}", progress=0.06 + 0.88 * ev["frame"] / frames,
+                     frame_times=list(times))
+            if "done" in ev:
+                result = ev["done"]
+            if "error" in ev:
+                err = ev["error"]
+        proc.wait()
+        if cancel_flag.is_set():
+            _set(state="cancelled", stage="Cancelled", progress=0.0)
+            return
+        if result is None:
+            tail = (OUT_DIR / ".worker-L.log").read_text()[-600:]
+            raise RuntimeError(err or f"FastFrames-L stopped unexpectedly (exit {proc.returncode}). {tail}")
+        per = result.get("frame_times") or times
+        if len(per) >= len(cfg.get("frame_profile_L") or []):
+            cfg["frame_profile_L"] = per
+            save_config(cfg)
+        rec = {"file": out_mp4.name, "prompt": prompt, "seed": seed, "latent_frames": frames, "model": "L",
+               "video_frames": 4 * frames - 3, "seconds": round((4 * frames - 3) / 16, 2),
+               "decoder": params.get("decoder", "fp32"), "text_s": result.get("text_s"),
+               "text_cached": result.get("text_cached"), "rollout_s": result.get("rollout_s"),
+               "decode_s": result.get("decode_s"), "total_s": round(time.time() - t_start, 1),
+               "peak_gb": result.get("peak_gb"), "frame_times": per, "created": time.strftime("%Y-%m-%d %H:%M:%S")}
+        out_mp4.with_suffix(".json").write_text(json.dumps(rec, indent=1))
+        _set(state="done", stage="Done", progress=1.0, result=rec)
+    except Exception as e:
+        traceback.print_exc()
+        _set(state="error", stage="Error", error=f"{type(e).__name__}: {e}")
+    finally:
+        worker["proc"] = None
+        cancel_flag.clear()
+        print(f"[job {jid} L] {job.get('state')}", flush=True)
 
 
 def _set(**kw):
@@ -212,7 +303,7 @@ def run_job(params):
         if frames == len(DEFAULT_FRAME_S) or len(per) >= len(cfg.get("frame_profile") or []):
             cfg["frame_profile"] = per
             save_config(cfg)
-        rec = {"file": out_mp4.name, "prompt": prompt, "seed": seed, "latent_frames": frames,
+        rec = {"file": out_mp4.name, "prompt": prompt, "seed": seed, "latent_frames": frames, "model": "S",
                "video_frames": 4 * frames - 3, "seconds": round((4 * frames - 3) / 16, 2),
                "decoder": decoder, "text_s": round(text_s, 2), "text_cached": info.get("text_cached", 0) > 0,
                "rollout_s": round(rollout_s, 2), "decode_s": round(decode_s, 2),
@@ -239,16 +330,19 @@ def start_job(body):
     frames = max(2, min(21, int(body.get("frames", 21))))
     seed = int(body.get("seed", 0)) & 0x7FFFFFFF
     decoder = body.get("decoder") if body.get("decoder") in ("fp32", "bf16") else "fp32"
+    model = "L" if body.get("model") == "L" else "S"
+    if model == "L" and not l_port():
+        return {"error": "FastFrames-L isn't set up. See the README (FastFrames-L section)."}, 400
     with state_lock:
         if job.get("state") == "running":
             return {"error": "A video is already generating."}, 409
         jid = job["id"] + 1
         job.clear()
         job.update(id=jid, state="running", stage="Starting", progress=0.0, prompt=prompt, seed=seed,
-                   frames=frames, started=time.time(), eta=eta_seconds(frames), frame_times=[])
+                   frames=frames, model=model, started=time.time(), eta=eta_seconds(frames, model=model), frame_times=[])
     cancel_flag.clear()
     params = {"id": jid, "prompt": prompt, "seed": seed, "frames": frames, "decoder": decoder}
-    threading.Thread(target=run_job, args=(params,), daemon=True).start()
+    threading.Thread(target=run_job_l if model == "L" else run_job, args=(params,), daemon=True).start()
     return {"id": jid}, 200
 
 
@@ -600,8 +694,10 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/api/history":
             return self._json(history())
         if p == "/api/config":
-            return self._json({k: v for k, v in cfg.items() if k not in ("frame_profile", "verified")}
+            return self._json({k: v for k, v in cfg.items() if k not in ("frame_profile", "verified", "frame_profile_L")}
                               | {"eta_full": round(eta_seconds(21)), "frame_profile": cfg.get("frame_profile"),
+                                 "l_available": bool(l_port()), "l_timed": bool(cfg.get("frame_profile_L")),
+                                 "frame_profile_L": cfg.get("frame_profile_L") or [x * 7 for x in DEFAULT_FRAME_S],
                                  "model_dir": str(MODEL_DIR or cfg.get("model_dir") or "(downloads on first use)"),
                                  "out_dir": str(OUT_DIR),
                                  "search_dirs": cfg.get("model_search_dirs") or PM.DEFAULT_SEARCH_DIRS})
@@ -625,6 +721,9 @@ class Handler(BaseHTTPRequestHandler):
             if p == "/api/cancel":
                 if job.get("state") == "running":
                     cancel_flag.set()
+                    wp = worker.get("proc")
+                    if wp is not None and wp.poll() is None:
+                        wp.terminate()
                 return self._json({"ok": True})
             if p == "/api/enhance":
                 idea = (body.get("prompt") or "").strip()
@@ -656,6 +755,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"ok": True})
                 def _quit():
                     stop_llm()
+                    wp = worker.get("proc")
+                    if wp is not None and wp.poll() is None:
+                        wp.terminate()
                     vp = verify.get("proc")
                     if vp is not None and vp.poll() is None:
                         vp.terminate()
