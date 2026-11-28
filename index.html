@@ -587,6 +587,7 @@ $("#saveSet").onclick=async()=>{ await api("/api/config",{keep_llm_loaded:$("#ke
   await api("/api/models/rescan",{}); await loadModels(); await loadSet(); $("#setMsg").textContent="Saved — models rescanned"; setTimeout(()=>$("#setMsg").textContent="",2000); };
 $("#stopLlm").onclick=async()=>{ await api("/api/llm/stop",{}); toast("Prompt model unloaded"); };
 $("#quitBtn").onclick=async()=>{ if(!confirm("Quit FastFrames Studio?")) return;
+  if(window.webkit?.messageHandlers?.app){ window.webkit.messageHandlers.app.postMessage("quit"); return; }
   try{ await api("/api/quit",{}); document.body.innerHTML='<div style="display:grid;place-items:center;height:100vh;color:#9a9a9a">FastFrames Studio has quit. You can close this window.</div>'; }
   catch(e){ toast(e.message); } };
 

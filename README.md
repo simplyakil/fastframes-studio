@@ -61,8 +61,9 @@ On an M1 Max a full 5-second clip takes about **1½ minutes**, and a 1-second pr
 - Every clip with its prompt, seed, length and render time, newest first.
 - Hover to play, **Reuse** to load the exact prompt and seed, reveal in Finder, or move to Trash.
 
-### 🖥 Feels like a Mac app
-- Double-click **FastFrames Studio.app**; it opens in its own window.
+### 🖥 A real Mac app
+- **FastFrames Studio.app** has its own window, Dock icon and menu bar (⌘1–3 switch pages, ⌘, opens Settings).
+- It starts its local server when you open it, and **⌘Q stops everything** and frees the memory (it warns you if a video is still generating).
 - Live **GPU and memory meters** in the sidebar.
 - Runs on `127.0.0.1` only — nothing leaves your Mac.
 
@@ -73,7 +74,7 @@ On an M1 Max a full 5-second clip takes about **1½ minutes**, and a 1-second pr
 | Mac | Apple silicon (M1 or newer), macOS 14+ |
 | Memory | 16 GB minimum, 32 GB+ recommended (FastFrames peaks at ~11 GB) |
 | Disk | ~16 GB for the model (downloaded on first use) |
-| Software | Python 3.10+, `ffmpeg` (`brew install ffmpeg`) |
+| Software | Python 3.10+, `ffmpeg` (`brew install ffmpeg`), Xcode Command Line Tools to build the app (`xcode-select --install`) |
 | Prompt writer (optional) | a recent llama.cpp `llama-server` (`brew install llama.cpp`) plus any small GGUF chat model — e.g. LiquidAI LFM3-1.7B — or a running MLX-Serve, LM Studio or Ollama |
 
 ## Install
@@ -82,7 +83,7 @@ On an M1 Max a full 5-second clip takes about **1½ minutes**, and a 1-second pr
 git clone https://github.com/simplyakil/fastframes-studio.git
 cd fastframes-studio
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-./tools/make_app.sh                  # builds ~/Applications/FastFrames Studio.app
+./tools/make_app.sh                  # builds ~/Applications/FastFrames Studio.app (native app)
 open ~/Applications/"FastFrames Studio.app"
 ```
 
@@ -102,8 +103,8 @@ Copy `config.example.json` to `config.json` (it's git-ignored) and edit what you
 | `model_search_dirs` | folders scanned for GGUF chat models |
 | `keep_llm_loaded` | keep the prompt model in memory between prompts |
 
-Closing the window leaves the server running so it reopens instantly; **Settings → Quit** stops it
-and frees memory.
+Quitting the app (⌘Q, or **Settings → Quit**) stops the server and frees its memory. If you started
+the server with `./launch.sh` instead, it keeps running in the background until you quit it from Settings.
 
 ## Good to know
 

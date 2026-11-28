@@ -588,6 +588,9 @@ class Handler(BaseHTTPRequestHandler):
                      verifying=verify["current"], verify_queue=verify["queue"])
             return self._json(s)
         if p == "/api/models":
+            t0 = time.time()
+            while catalog["scanning"] and time.time() - t0 < 30:   # first scan after startup still running
+                time.sleep(0.2)
             if time.time() - catalog["scanned"] > 60:
                 rescan()
             cm = current_model()
